@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<opencv_storage>
+<R_cam2gripper>
+  <_ type_id="opencv-matrix">
+    <rows>3</rows>
+    <cols>3</cols>
+    <dt>d</dt>
+    <data>
+      9.9916395353852960e-01 -1.6702421213746738e-02
+      -3.7315185579765139e-02 -1.6982554416864606e-02
+      -9.9982984115550921e-01 -7.2028869509528914e-03
+      -3.7188530419095256e-02 7.8305721724887256e-03
+      -9.9927758673189770e-01</data></_></R_cam2gripper>
+<T_cam2gripper>
+  <_ type_id="opencv-matrix">
+    <rows>3</rows>
+    <cols>1</cols>
+    <dt>d</dt>
+    <data>
+      -5.3473537140042232e+01 3.9680975806509736e+01
+      6.5506413726335836e+01</data></_></T_cam2gripper>
+</opencv_storage>
