@@ -132,6 +132,145 @@ void __stdcall callBack(uint16_t cmd, uint16_t rlt, uint16_t* msg, int len) {
 
 }
 
+//Saving multiple homogenous coordinate matrix
+void writeXml(FileStorage _fileStorage, string filename, vector<Mat> rvec, vector<Mat> tvec) {
+    _fileStorage << "R_" + filename << "[";
+    for (int i = 0; i < rvec.size(); i++) {
+        _fileStorage << rvec[i];
+    }
+    _fileStorage << "]";
+    // Storing T_gripper2base info as a array.
+    _fileStorage << "T_" + filename << "[";
+    for (int i = 0; i < tvec.size(); i++) {
+        _fileStorage << tvec[i];
+    }
+    _fileStorage << "]";
+}
+
+//Saving single homogenous coordinate matrix
+void writeXml(FileStorage _fileStorage, string filename, Mat rvec, Mat tvec) {
+    _fileStorage << "R_" + filename << "[";
+
+    _fileStorage << rvec;
+
+    _fileStorage << "]";
+
+    _fileStorage << "T_" + filename << "[";
+    _fileStorage << tvec;
+    _fileStorage << "]";
+}
+
+//Saving single matrix
+void writeXml(FileStorage _fileStorage, string filename, Mat matrix) {
+    _fileStorage << filename << "[";
+    _fileStorage << matrix;
+    _fileStorage << "]";
+}
+
+void writeXml(FileStorage _fileStorage, string filename, Pos pos) {
+    _fileStorage << "R_" + filename << "[";
+
+    _fileStorage << pos.rotation;
+
+    _fileStorage << "]";
+
+    _fileStorage << "T_" + filename << "[";
+    _fileStorage << pos.translation;
+    _fileStorage << "]";
+}
+
+
+void writeXml(FileStorage _fileStorage, string filename, vector<Pos> pos) {
+    _fileStorage << "R_" + filename << "[";
+    for (int i = 0; i < pos.size(); i++) {
+        _fileStorage << pos[i].rotation;
+    }
+    _fileStorage << "]";
+    // Storing T_gripper2base info as a array.
+    _fileStorage << "T_" + filename << "[";
+    for (int i = 0; i < pos.size(); i++) {
+        _fileStorage << pos[i].translation;
+    }
+    _fileStorage << "]";
+}
+
+
+//Loading multiple homogenous coordinate matrix
+void readXml(FileStorage _fileStorage, string filename, vector<Mat>& rvec, vector<Mat>& tvec) {
+    FileNode fnode = _fileStorage["R_" + filename];
+    for (FileNodeIterator it = fnode.begin(); it != fnode.end(); ) {
+        Mat tmp;
+        it >> tmp;
+        rvec.push_back(tmp);
+        tmp.release();
+    }
+    fnode = _fileStorage["T_" + filename];
+    for (FileNodeIterator it = fnode.begin(); it != fnode.end(); ) {
+        Mat tmp;
+        it >> tmp;
+        tvec.push_back(tmp);
+        tmp.release();
+    }
+}
+
+//Loading single homogenous coordinate matrix
+void readXml(FileStorage _fileStorage, string filename, Mat& rvec, Mat& tvec) {
+    FileNode fnode = _fileStorage["R_" + filename];
+    for (FileNodeIterator it = fnode.begin(); it != fnode.end(); ) {
+        Mat tmp;
+        it >> tmp;
+        rvec = tmp.clone();
+    }
+    fnode = _fileStorage["T_" + filename];
+    for (FileNodeIterator it = fnode.begin(); it != fnode.end(); ) {
+        Mat tmp;
+        it >> tmp;
+        tvec = tmp.clone();
+    }
+}
+
+
+//Loading multiple homogenous coordinate matrix
+void readXml(FileStorage _fileStorage, string filename, vector<Pos>& pos) {
+    FileNode fnode = _fileStorage["R_" + filename];
+    FileNode fnode2 = _fileStorage["T_" + filename];
+    for (FileNodeIterator it = fnode.begin(), it2 = fnode2.begin(); it != fnode.end(), it2 != fnode2.end();) {
+        Mat R_tmp;
+        Mat T_tmp;
+        it >> R_tmp;
+        it2 >> T_tmp;
+        pos.push_back(Pos(R_tmp, T_tmp));
+        R_tmp.release();
+        T_tmp.release();
+        
+    }
+}
+
+//Loading single homogenous coordinate matrix
+void readXml(FileStorage _fileStorage, string filename, Pos pos) {
+    FileNode fnode = _fileStorage["R_" + filename];
+    FileNode fnode2 = _fileStorage["T_" + filename];
+    for (FileNodeIterator it = fnode.begin(), it2 = fnode2.begin(); it != fnode.end();) {
+        Mat R_tmp;
+        Mat T_tmp;
+        it >> R_tmp;
+        it2 >> T_tmp;
+        pos = Pos(R_tmp, T_tmp);
+        R_tmp.release();
+        T_tmp.release();
+    }
+}
+
+
+//Loading single matrix
+void readXml(FileStorage _fileStorage, string filename, Mat& matrix) {
+    FileNode fnode = _fileStorage[filename];
+    for (FileNodeIterator it = fnode.begin(); it != fnode.end(); ) {
+        Mat tmp;
+        it >> tmp;
+        matrix = tmp.clone();
+    }
+}
 
 void eulerAngle2rotationMatrix(Mat angleVec, Mat& rotMat) {
 
@@ -926,6 +1065,13 @@ void bundle_adjustment(
     }
 }
 
+void getimage2world(Mat _cMatrix, Mat R_cam2gripper,Mat T_cam2gripper,Pos pos ,Point3d pos2d, Point3d& pos3d) {
+    Mat inv_cMatrix;
+    Mat ext = (Mat_<double>(1, 3) << 0, 0, 1);
+    vconcat(cMatrix.inv(), ext, inv_cMatrix);
+    Mat matrix = Mat((cv::Affine3d(R_cam2gripper, T_cam2gripper) * pos.affine).matrix).rowRange(0,3) * inv_cMatrix * Mat(pos2d).reshape(1, 3); //[3*4] * [4*3] * [3*1]
+    pos3d = Point3d(matrix);
+}
 void get_RMSE(Mat R_cam2gripper, Mat T_cam2gripper) {
     Mat R_pos1 = (Mat_<double>(1, 3) << -0.583, -16.423, 0);
     Mat T_pos1 = (Mat_<double>(1, 3) << -109.950, 431.824, 55.793);
@@ -952,60 +1098,84 @@ void get_RMSE(Mat R_cam2gripper, Mat T_cam2gripper) {
         std::cout << structure_test << endl;
         cout << "RMSE: " << std::sqrt((pow(structure_test[j].x - gt.x, 2) + pow(structure_test[j].y - gt.y, 2) + pow(structure_test[j].z - gt.z, 2) / 3)) << endl;
     }
-    double fx = cMatrix.at<double>(0, 0);
-    double fy = cMatrix.at<double>(1, 1);
-    double cx = cMatrix.at<double>(0, 2);
-    double cy = cMatrix.at<double>(1, 2);
 
     vector<Point3d> structure;
     vector<Vec3b> colors;
     vector<cv::Affine3d> cam2base;
 
-    Mat cam_coord_1 = (Mat_<double>(4, 1) <<  (_p1[0].x - cx) / fx, (_p1[0].y - cy) / fy,1,1);
+    Mat image_coord = (Mat_<double>(3, 1) << _p1[0].x, _p1[0].y, 1);    //3*1
+    Mat cam_coord = cMatrix.inv() * image_coord;                        //3*1
+    vconcat(cam_coord, cv::Mat::ones(1, 1, CV_64FC1), cam_coord);       //4*1
+    Mat world_coord = Mat(cv::Affine3d(R_base2camtest1, T_base2camtest1).inv().matrix * cam_coord).rowRange(0,3) ; //3*1
     cam2base.push_back(cv::Affine3d(R_base2camtest1, T_base2camtest1).inv());
-    cv::Mat resize_cam2base_1 = Mat(cam2base[0].matrix).rowRange(0,3) * cam_coord_1;
-    structure.push_back(cv::Point3d(resize_cam2base_1.at<double>(0,0), resize_cam2base_1.at<double>(1, 0), resize_cam2base_1.at<double>(2, 0)));
+    structure.push_back(Point3d(world_coord));
     colors.push_back(cv::Vec3b(255, 255, 255));
-    Vec3d Oe = structure[0];
-    Vec3d Oc = cam2base[0].translation();
-    Vec3d Fx;
 
-    //Get initial Fx
-    cv::normalize(Oc - Oe, Fx);
+    /*Mat cam_coord_1 = (Mat_<double>(4, 1) <<  (_p1[0].x - cx) / fx, (_p1[0].y - cy) / fy,1,1);
+    cam2base.push_back(cv::Affine3d(R_base2camtest1, T_base2camtest1).inv());
+    cv::Mat resize_cam2base_1 = Mat(cam2base[0].matrix).rowRange(0,3) * cam_coord_1;*/
 
-    //Get initial P
-    Point3d P = Oc - Fx;
-    structure.push_back(P);
-    colors.push_back(cv::Vec3b(255, 255, 255));  
+    /*structure.push_back(cv::Point3d(resize_cam2base_1.at<double>(0,0), resize_cam2base_1.at<double>(1, 0), resize_cam2base_1.at<double>(2, 0)));
+    colors.push_back(cv::Vec3b(255, 255, 255));*/
 
-    //Build a plane
-    Mat A = Mat(Fx).reshape(1,1);
-    Mat X = Mat(P).reshape(1, 3);
-    Mat init_plane = A * X;
-    cv::hconcat(A, init_plane, init_plane);
-    cout <<"init_plane: "<< init_plane << endl;
-    /*Mat cam_coord_2 = (Mat_<double>(4, 1) << (_p2[0].x - cx) / fx, (_p2[0].y - cy) / fy, 1, 1);
-    cam2base.push_back(cv::Affine3d(R_base2camtest2, T_base2camtest2).inv());
-    cv::Mat resize_cam2base_2 = Mat(cam2base[1].matrix).rowRange(0, 3) * cam_coord_2;
-    structure.push_back(cv::Point3d(resize_cam2base_2.at<double>(0, 0), resize_cam2base_2.at<double>(1, 0), resize_cam2base_2.at<double>(2, 0)));
-    colors.push_back(cv::Vec3b(255, 255, 255));
-    cout << cam2base[1].translation() << endl;
-    cout << structure[1] << endl;*/
 
-    double axes_scale = 1;
-    viz::Viz3d myWindow("Viz Ellipse Cone");
-    
+    //Vec3d Oe = structure[0];
+    //Vec3d Oc = cam2base[0].translation();
+    //Vec3d Fx;
+    ////Get initial Fx
+    //cv::normalize(Oc - Oe, Fx);
 
-    viz::WCloud structure_widget(structure, colors);
-    myWindow.showWidget("Point Cloud", structure_widget);
-    //myWindow.showWidget("camera_frame_and_lines", viz::WTrajectory(cam2base, viz::WTrajectory::BOTH, 0.1));
-    myWindow.showWidget("camera_frustums", viz::WTrajectoryFrustums(cam2base, Matx33d(cMatrix), axes_scale, cv::viz::Color::blue()));
-    //myWindow.showWidget("initplane",viz::WPlane(P, Fx,))
-    myWindow.spin();
+    ////Get initial P
+    //Point3d P = Oc - Fx;
+    //structure.push_back(P);
+    //colors.push_back(cv::Vec3b(255, 255, 255));  
+
+    ////Build a plane
+    //Mat A = Mat(Fx).reshape(1,1);
+    //Mat X = Mat(P).reshape(1, 3);
+    //Mat init_plane = A * X;
+    //cv::hconcat(A, init_plane, init_plane);
+    //cout <<"init_plane: "<< init_plane << endl;
+    ///*Mat cam_coord_2 = (Mat_<double>(4, 1) << (_p2[0].x - cx) / fx, (_p2[0].y - cy) / fy, 1, 1);
+    //cam2base.push_back(cv::Affine3d(R_base2camtest2, T_base2camtest2).inv());
+    //cv::Mat resize_cam2base_2 = Mat(cam2base[1].matrix).rowRange(0, 3) * cam_coord_2;
+    //structure.push_back(cv::Point3d(resize_cam2base_2.at<double>(0, 0), resize_cam2base_2.at<double>(1, 0), resize_cam2base_2.at<double>(2, 0)));
+    //colors.push_back(cv::Vec3b(255, 255, 255));
+    //cout << cam2base[1].translation() << endl;
+    //cout << structure[1] << endl;*/
+
+    //double axes_scale = 1;
+    //viz::Viz3d myWindow("Viz Ellipse Cone");
+    //
+
+    //viz::WCloud structure_widget(structure, colors);
+    //myWindow.showWidget("Point Cloud", structure_widget);
+    ////myWindow.showWidget("camera_frame_and_lines", viz::WTrajectory(cam2base, viz::WTrajectory::BOTH, 0.1));
+    //myWindow.showWidget("camera_frustums", viz::WTrajectoryFrustums(cam2base, Matx33d(cMatrix), axes_scale, cv::viz::Color::blue()));
+    ////myWindow.showWidget("initplane",viz::WPlane(P, Fx,))
+    //myWindow.spin();
 
 }
 
-void ellipsesDetection() {
+void ellipsesDetection(Mat R_cam2gripper, Mat T_cam2gripper) {
+
+    FileStorage cp("campos.xml", FileStorage::READ);
+    vector<Pos> pos;
+
+
+    if (!cp.isOpened()) {
+        FileStorage cp("campos.xml", FileStorage::WRITE);
+        double pos1[6] = {126.615,362.832,19.756,-0.524,20.684,0.004};
+        double pos2[6] = {-135.153,443.965,59.206,-10.558,-13.975,0};
+        pos.push_back(cv::Affine3d(R_cam2gripper,T_cam2gripper) * Pos(pos1).affine);
+        pos.push_back(cv::Affine3d(R_cam2gripper, T_cam2gripper) * Pos(pos2).affine);
+        writeXml(cp,"campos",pos);
+    }
+    else {
+        readXml(cp, "campos", pos);
+    }
+        
+    cout << pos.size() << endl;
     string sWorkingDir = "C:\\Users\\eug19\\workspace\\\project_all_in_one\\\project_all_in_one\\dataset\\"; 
     string out_folder = "C:\\Users\\eug19\\workspace\\project_all_in_one\\";
 
@@ -1016,7 +1186,7 @@ void ellipsesDetection() {
     vector<double> tms;
 
     glob(sWorkingDir + "images\\" + "*.*", names);
-
+    int cnt = 0;
     for (const auto& image_name : names)
     {
         string name_ext = image_name.substr(image_name.find_last_of("\\") + 1);
@@ -1070,94 +1240,92 @@ void ellipsesDetection() {
         Mat3b resultImage = image.clone();
 
         yaed.DrawDetectedEllipses(resultImage, ellsYaed);
-        imwrite(out_folder + name + ".png", resultImage);
-        cv::namedWindow("Yaed", WINDOW_NORMAL);
-        cv:imshow("Yaed", resultImage);
-        waitKey();
+        //imwrite(out_folder + name + ".png", resultImage);
+        //cv::namedWindow("Yaed", WINDOW_NORMAL);
+        //cv:imshow("Yaed", resultImage);
+        //waitKey();
+        float u = ellsYaed[0]._xc;
+        float v = ellsYaed[0]._yc;
+        float a = ellsYaed[0]._a;
+        float b = ellsYaed[0]._b;
+        float rad = ellsYaed[0]._rad;
+
+        //Point3d imgMajorPos = { u + a * cos(rad),  v + a * sin(rad), 1};
+        //Point3d imgMinorPos = { u - b * sin(rad),  v + b * cos(rad), 1};
+        //Point3d imgCenterPos = { u, v, 1};
+        //Point3d worldMajorPos;
+        //Point3d worldMinorPos;
+        //Point3d worldCenterPos;
+        //
+        //getimage2world(cMatrix, R_cam2gripper, T_cam2gripper, pos[cnt], imgMajorPos, worldMajorPos);
+        //getimage2world(cMatrix, R_cam2gripper, T_cam2gripper, pos[cnt], imgMinorPos, worldMinorPos);
+        //getimage2world(cMatrix, R_cam2gripper, T_cam2gripper, pos[cnt], imgCenterPos, worldCenterPos);
+
+
+        double A = pow(a, 2) * pow(sin(rad), 2) + pow(b, 2) * pow(cos(rad), 2);
+        double B = 2 * (pow(b, 2) - pow(a, 2)) * sin(rad) * cos(rad);
+        double C = pow(a, 2) * pow(cos(rad), 2) + pow(b, 2) * pow(sin(rad),2);
+        double D = -(2 * A * u + B * v);
+        double E = -(B * u + 2 * C * v);
+        double F = A * pow(u, 2) + B * u * v + C * pow(v, 2) - pow(a, 2) * pow(b, 2);
+
+        Mat EllipseC = (Mat_<double>(3, 3) << A, B / 2, D / 2, B / 2, C, E / 2, D / 2, E / 2, F);
+        //Mat extrinsic = Mat(pos[cnt].affine.concatenate(cv::Affine3d(R_cam2gripper, T_cam2gripper)).inv().matrix).rowRange(0,3) ;   //extrinsic = world2cam =(cam2gripper * gripper2world).inv().rowRange(0,3) == 3*4 matrix 
+        //Mat P = cMatrix * extrinsic;
+        Mat EllipseQ = cMatrix.inv().t() * EllipseC * cMatrix.inv();
+        cout << "EllipseC" << endl;
+        cout << EllipseC << endl;
+        cout << "EllipseQ" << endl;
+        cout << EllipseQ << endl;
+
+        Mat eigenval, eigenvec;
+        cv::eigen(EllipseQ, eigenval, eigenvec);
+        Mat v1 = eigenvec.rowRange(0, 1);
+        Mat v2 = eigenvec.rowRange(1, 2);
+        Mat v3 = eigenvec.rowRange(2, 3);
+
+
+        cout << "eigenval" << endl;
+        cout << eigenval << endl;
+        cout << "eigenvec" << endl;
+        cout << eigenvec << endl;
+       
+
+        double l1 = eigenval.at<double>(0, 0);
+        double l2 = eigenval.at<double>(1, 0);
+        double l3 = eigenval.at<double>(2, 0);
+
+        double _a = std::sqrt(-l3 / l1);
+        double _b = std::sqrt(-l3 / l2);
+
+        //eigenvec.inv() = new2old
+        Mat tmp = eigenvec.inv() * (Mat_<double>(3, 1) << 0, 0, 1);
+        vconcat(tmp, Mat::ones(1, 1, CV_64FC1), tmp);
+
+        Mat circle_center = Mat((cv::Affine3d(R_cam2gripper, T_cam2gripper) * pos[cnt].affine).matrix).rowRange(0, 3) * tmp;
+        Mat circle_rotation = (eigenvec *  Mat((cv::Affine3d(R_cam2gripper, T_cam2gripper) * pos[cnt].affine).rotation()));
+        
+        double _degree = std::acos(std::sqrt( (_b * _b * (_a *_a + 1)) / (_a * _a * (_b * _b + 1)) ));
+        
+        //double axes_scale = 1;
+        //viz::Viz3d myWindow("Viz Ellipse Cone");
+        //
+
+        //vector<Point3d> structure;
+        //vector<Vec3b> colors;
+        //vector<cv::Affine3d> cam2base;
+        ////.rotate(Vec3d(CV_PI, 0, 0))
+        //cam2base.push_back(pos[0].affine);
+        //myWindow.showWidget("camera_frame_and_lines", viz::WTrajectory(cam2base, viz::WTrajectory::BOTH, 20));
+        //myWindow.showWidget("camera_frustums", viz::WTrajectoryFrustums(cam2base, Matx33d(cMatrix), 20, cv::viz::Color::blue()));
+        //myWindow.showWidget("Original coord", viz::WCoordinateSystem(20));
+        //myWindow.showWidget("Floor Plane", viz::WPlane(Point3d(0, 0, -370.489), Vec3d(0, 0, 1), Vec3d(0, 1, 0), Size2d(1000, 1000), cv::viz::Color::black()));
+        //myWindow.spin();
+        
+        cnt++;
     }
 }
 
-void getNormvecCent() {
-
-}
-//Saving multiple homogenous coordinate matrix
-void writeXml(FileStorage _fileStorage,string filename, vector<Mat> rvec, vector<Mat> tvec) {
-    _fileStorage << "R_" + filename << "[";
-    for (int i = 0; i < rvec.size(); i++) {
-        _fileStorage << rvec[i];
-    }
-    _fileStorage << "]";
-    // Storing T_gripper2base info as a array.
-    _fileStorage << "T_" + filename << "[";
-    for (int i = 0; i < tvec.size(); i++) {
-        _fileStorage << tvec[i];
-    }
-    _fileStorage << "]";
-}
-
-//Saving single homogenous coordinate matrix
-void writeXml(FileStorage _fileStorage, string filename, Mat rvec, Mat tvec) {
-    _fileStorage << "R_" + filename << "[";
-
-    _fileStorage << rvec;
-
-    _fileStorage << "]";
-
-    _fileStorage << "T_" + filename << "[";
-    _fileStorage << tvec;
-    _fileStorage << "]";
-}
-
-//Saving single matrix
-void writeXml(FileStorage _fileStorage, string filename, Mat matrix) {
-    _fileStorage << filename << "[";
-    _fileStorage << matrix;
-    _fileStorage << "]";
-}
-
-//Loading multiple homogenous coordinate matrix
-void readXml(FileStorage _fileStorage, string filename, vector<Mat>& rvec, vector<Mat>& tvec) {
-    FileNode fnode = _fileStorage["R_" + filename];
-    for (FileNodeIterator it = fnode.begin(); it != fnode.end(); ) {
-        Mat tmp;
-        it >> tmp;
-        rvec.push_back(tmp);
-        tmp.release();
-    }
-    fnode = _fileStorage["T_" + filename];
-    for (FileNodeIterator it = fnode.begin(); it != fnode.end(); ) {
-        Mat tmp;
-        it >> tmp;
-        tvec.push_back(tmp);
-        tmp.release();
-    }
-}
-
-//Loading single homogenous coordinate matrix
-void readXml(FileStorage _fileStorage, string filename, Mat& rvec, Mat& tvec) {
-    FileNode fnode = _fileStorage["R_" + filename];
-    for (FileNodeIterator it = fnode.begin(); it != fnode.end(); ) {
-        Mat tmp;
-        it >> tmp;
-        rvec = tmp.clone();
-    }
-    fnode = _fileStorage["T_" + filename];
-    for (FileNodeIterator it = fnode.begin(); it != fnode.end(); ) {
-        Mat tmp;
-        it >> tmp;
-        tvec = tmp.clone();
-    }
-}
-
-//Loading single matrix
-void readXml(FileStorage _fileStorage, string filename, Mat& matrix) {
-    FileNode fnode = _fileStorage[filename];
-    for (FileNodeIterator it = fnode.begin(); it != fnode.end(); ) {
-        Mat tmp;
-        it >> tmp;
-        matrix = tmp.clone();
-    }
-}
 
 int main(){
 
@@ -1165,17 +1333,15 @@ int main(){
     FileStorage w2c("world2cam.xml", FileStorage::READ);
     FileStorage cm("cMatrix.xml", FileStorage::READ);
     //[gripper frame] 轉換至 [base frame]
-    vector<cv::Affine3d> gripper2base;
-    gripper2base.reserve(grabFrames_amount_calib);
+    vector<Pos> gripper2base;
     vector<Mat> R_gripper2base, T_gripper2base;
 
     //[camera frame] 轉換至 [world frame]
-    vector<cv::Affine3d> world2cam;
-    world2cam.reserve(grabFrames_amount_calib);
+    vector<Pos> world2cam;
     vector<Mat> R_world2cam, T_world2cam;
 
     //[camera frame] 轉換至 [gripper frame] == 手眼校正的X
-    cv::Affine3d cam2gripper;
+    vector<Pos> cam2gripper;
     Mat R_cam2gripper, T_cam2gripper;
 
     
@@ -1279,7 +1445,7 @@ int main(){
         std::cout << T_world2cam[i] << endl;
     }
     std::cout << endl;
-    std::cout << "=====================================================================" << endl;
+    std::cout << "======================================================    ===============" << endl;
 
     std::cout << "=======================Output cam2gripper initial Calib=======================" << endl;
     std::cout << R_cam2gripper << endl;
@@ -1288,8 +1454,7 @@ int main(){
 
     get_RMSE(R_cam2gripper, T_cam2gripper);
     
-    ellipsesDetection();
-    //getNormvecCent();
+    ellipsesDetection(R_cam2gripper, T_cam2gripper);
     return 0;
     
 

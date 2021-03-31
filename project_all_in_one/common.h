@@ -153,12 +153,16 @@ float GetMinAnglePI(float alpha, float beta);
 
 class Pos {
 public:
+    Pos() {
+
+    }
     Pos(cv::Mat _euler) :eulerMat{ _euler }
     {
-
-        cv::Mat angleVec = (cv::Mat_<double>(3, 1) << _euler.at<double>(3, 0), _euler.at<double>(4, 0), _euler.at<double>(5, 0));
+        cv::Mat angleVec = (cv::Mat_<double>(1, 3) << _euler.at<double>(3, 0), _euler.at<double>(4, 0), _euler.at<double>(5, 0));
         eulerAngle2rotationMatrix(angleVec, this->rotation);
         this->translation = (cv::Mat_<double>(3, 1) << _euler.at<double>(0, 0), _euler.at<double>(1, 0), _euler.at<double>(2, 0));
+        /*cout << this->rotation << endl;
+        cout << this->translation << endl;*/
         affine = cv::Affine3d(this->rotation, this->translation);
         for (int i = 0; i < 6; i++) {
             eulerVec[i] = this->eulerMat.at<double>(i, 0);
@@ -169,10 +173,9 @@ public:
         for (int i = 0; i < 6; i++) {
             eulerVec[i] = _eulerVec[i];
         }
-        for (int i = 0; i < 6; i++) {
-            this->eulerMat.at<double>(i, 0) = eulerVec[i];
-        }
-        cv::Mat angleVec = (cv::Mat_<double>(3, 1) << eulerMat.at<double>(3, 0), eulerMat.at<double>(4, 0), eulerMat.at<double>(5, 0));
+        this->eulerMat = (cv::Mat_<double>(6, 1) << eulerVec[0], eulerVec[1], eulerVec[2], eulerVec[3], eulerVec[4], eulerVec[5]);
+        
+        cv::Mat angleVec = (cv::Mat_<double>(1, 3) << eulerMat.at<double>(3, 0), eulerMat.at<double>(4, 0), eulerMat.at<double>(5, 0));
         eulerAngle2rotationMatrix(angleVec, this->rotation);
         this->translation = (cv::Mat_<double>(3, 1) << eulerMat.at<double>(0, 0), eulerMat.at<double>(1, 0), eulerMat.at<double>(2, 0));
         affine = cv::Affine3d(this->rotation, this->translation);
@@ -199,6 +202,20 @@ public:
         }
     }
 
+    void inline print(){
+        std::cout << "eulerMat: "<< eulerMat << std::endl;
+        std::cout << "eulerVec: " << "["<< eulerVec[0] << std::endl
+            << eulerVec[1] << std::endl
+            << eulerVec[2] << std::endl
+            << eulerVec[3] << std::endl
+            << eulerVec[4] << std::endl
+            << eulerVec[5] <<"]" << std::endl;
+        std::cout << "affine: " << affine.matrix << std::endl;
+        std::cout << "rotation: " << rotation << std::endl;
+        std::cout << "translation: " << translation << std::endl;
+       
+        
+    }
     cv::Mat eulerMat;           //6*1
     cv::Mat rotation;           //3*3
     cv::Mat translation;        //3*1

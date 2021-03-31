@@ -1195,7 +1195,6 @@ void CEllipseDetectorYaed::Triplets124(VVP& pi,
 
 				// Get the coordinates of the center (xc, yc)
 				Point2f center = GetCenterCoordinates(data_ij, data_ik);
-				cout << center << endl;
 				// Find remaining paramters (A,B,rho)
 				FindEllipses(center, edge_i, edge_j, edge_k, data_ij, data_ik, ellipses);
 				
