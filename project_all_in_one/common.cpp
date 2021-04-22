@@ -1126,8 +1126,10 @@ void cvCanny3(const void* srcarr, void* dstarr,
 	high_thresh *= bin_size;
 	low_thresh = cvFloor(threshold_ratio * float(high_thresh));
 
-	low_thresh = 50;
-	high_thresh = 100;
+	low_thresh = 20;
+	high_thresh = 200;
+	//low_thresh = 50;
+	//high_thresh = 100;
 
 	if (flags & CV_CANNY_L2_GRADIENT)
 	{

@@ -335,7 +335,7 @@ void rotationMatrix2eulerAngle(Mat R, Mat& angleVec) {
 
 
 
-//wait 'til manipulator stop
+//Wait 'til manipulator stop
 void wait(HROBOT device_id) {
     while (get_motion_state(device_id) != 1) {
     }
@@ -477,7 +477,7 @@ void model_circular_path_planning(HROBOT device_id,double* lookat_point,double**
         }
     }
 }
-void calib_circular_grabbing(int device_id, double** cart_coord, int grabFrames_amount, vector<Mat>& R_transMat, vector<Mat>& T_transMat, string _filename) {
+void camera_grabbing(int device_id, double** cart_coord, int grabFrames_amount, vector<Mat>& R_transMat, vector<Mat>& T_transMat, string _filename) {
     try
     {
         int cnt = 0;
@@ -568,7 +568,7 @@ void calib_grab_motion(HROBOT device_id,double * lookat_point,int grabFrames_amo
     //Grabbing [grabFrames_amount] images with circular path.
     //Outputting images and endeffector's transformation matrix.
     calib_circular_path_planning(device_id, lookat_point, cart_coord, grabFrames_amount, radius, added_z);
-    calib_circular_grabbing(device_id, cart_coord, grabFrames_amount, R_transMat, T_transMat, filename);
+    camera_grabbing(device_id, cart_coord, grabFrames_amount, R_transMat, T_transMat, filename);
     
     
     //deallocate pointer
@@ -596,7 +596,7 @@ void model_grab_motion(HROBOT device_id, double* lookat_point, int grabFrames_am
     //Grabbing [grabFrames_amount] images with circular path.
     //Outputting images and endeffector's transformation matrix.
     model_circular_path_planning(device_id, lookat_point, cart_coord, grabFrames_amount, radius, radius_lookat, added_z);
-    calib_circular_grabbing(device_id, cart_coord, grabFrames_amount, R_transMat, T_transMat, filename);
+    camera_grabbing(device_id, cart_coord, grabFrames_amount, R_transMat, T_transMat, filename);
 
     //deallocate pointer
     for (int i = 0; i < 6; ++i) {
@@ -1072,6 +1072,18 @@ void getimage2world(Mat _cMatrix, Mat R_cam2gripper,Mat T_cam2gripper,Pos pos ,P
     Mat matrix = Mat((cv::Affine3d(R_cam2gripper, T_cam2gripper) * pos.affine).matrix).rowRange(0,3) * inv_cMatrix * Mat(pos2d).reshape(1, 3); //[3*4] * [4*3] * [3*1]
     pos3d = Point3d(matrix);
 }
+
+double cosine_similarity(Mat A,Mat B)
+{
+    double dot = 0.0, denom_a = 0.0, denom_b = 0.0;
+    for (unsigned int i = 0u; i < 3; ++i) {
+        dot += A.at<double>(i,0) * B.at<double>(i, 0);
+        denom_a += A.at<double>(i, 0) * A.at<double>(i, 0);
+        denom_b += B.at<double>(i, 0) * B.at<double>(i, 0);
+    }
+    return dot / (std::sqrt(denom_a) * std::sqrt(denom_b));
+}
+
 void get_RMSE(Mat R_cam2gripper, Mat T_cam2gripper) {
     Mat R_pos1 = (Mat_<double>(1, 3) << -0.583, -16.423, 0);
     Mat T_pos1 = (Mat_<double>(1, 3) << -109.950, 431.824, 55.793);
@@ -1110,72 +1122,42 @@ void get_RMSE(Mat R_cam2gripper, Mat T_cam2gripper) {
     cam2base.push_back(cv::Affine3d(R_base2camtest1, T_base2camtest1).inv());
     structure.push_back(Point3d(world_coord));
     colors.push_back(cv::Vec3b(255, 255, 255));
-
-    /*Mat cam_coord_1 = (Mat_<double>(4, 1) <<  (_p1[0].x - cx) / fx, (_p1[0].y - cy) / fy,1,1);
-    cam2base.push_back(cv::Affine3d(R_base2camtest1, T_base2camtest1).inv());
-    cv::Mat resize_cam2base_1 = Mat(cam2base[0].matrix).rowRange(0,3) * cam_coord_1;*/
-
-    /*structure.push_back(cv::Point3d(resize_cam2base_1.at<double>(0,0), resize_cam2base_1.at<double>(1, 0), resize_cam2base_1.at<double>(2, 0)));
-    colors.push_back(cv::Vec3b(255, 255, 255));*/
-
-
-    //Vec3d Oe = structure[0];
-    //Vec3d Oc = cam2base[0].translation();
-    //Vec3d Fx;
-    ////Get initial Fx
-    //cv::normalize(Oc - Oe, Fx);
-
-    ////Get initial P
-    //Point3d P = Oc - Fx;
-    //structure.push_back(P);
-    //colors.push_back(cv::Vec3b(255, 255, 255));  
-
-    ////Build a plane
-    //Mat A = Mat(Fx).reshape(1,1);
-    //Mat X = Mat(P).reshape(1, 3);
-    //Mat init_plane = A * X;
-    //cv::hconcat(A, init_plane, init_plane);
-    //cout <<"init_plane: "<< init_plane << endl;
-    ///*Mat cam_coord_2 = (Mat_<double>(4, 1) << (_p2[0].x - cx) / fx, (_p2[0].y - cy) / fy, 1, 1);
-    //cam2base.push_back(cv::Affine3d(R_base2camtest2, T_base2camtest2).inv());
-    //cv::Mat resize_cam2base_2 = Mat(cam2base[1].matrix).rowRange(0, 3) * cam_coord_2;
-    //structure.push_back(cv::Point3d(resize_cam2base_2.at<double>(0, 0), resize_cam2base_2.at<double>(1, 0), resize_cam2base_2.at<double>(2, 0)));
-    //colors.push_back(cv::Vec3b(255, 255, 255));
-    //cout << cam2base[1].translation() << endl;
-    //cout << structure[1] << endl;*/
-
-    //double axes_scale = 1;
-    //viz::Viz3d myWindow("Viz Ellipse Cone");
-    //
-
-    //viz::WCloud structure_widget(structure, colors);
-    //myWindow.showWidget("Point Cloud", structure_widget);
-    ////myWindow.showWidget("camera_frame_and_lines", viz::WTrajectory(cam2base, viz::WTrajectory::BOTH, 0.1));
-    //myWindow.showWidget("camera_frustums", viz::WTrajectoryFrustums(cam2base, Matx33d(cMatrix), axes_scale, cv::viz::Color::blue()));
-    ////myWindow.showWidget("initplane",viz::WPlane(P, Fx,))
-    //myWindow.spin();
-
 }
 
 void ellipsesDetection(Mat R_cam2gripper, Mat T_cam2gripper) {
 
     FileStorage cp("campos.xml", FileStorage::READ);
     vector<Pos> pos;
-
+    
 
     if (!cp.isOpened()) {
+        
         FileStorage cp("campos.xml", FileStorage::WRITE);
-        double pos1[6] = {126.615,362.832,19.756,-0.524,20.684,0.004};
-        double pos2[6] = {-135.153,443.965,59.206,-10.558,-13.975,0};
-        pos.push_back(cv::Affine3d(R_cam2gripper,T_cam2gripper) * Pos(pos1).affine);
-        pos.push_back(cv::Affine3d(R_cam2gripper, T_cam2gripper) * Pos(pos2).affine);
+        
+        
+        
+        double pos1[6] = { -476.650, 19.139, -197.223, 24.706, 0.001, -0.003 };
+        double pos2[6] = { -552.570, 63.576, -199.586, 22.832, -14.481, -0.004 };
+        double pos3[6] = { -432.302, 166.327, -199.586, -1.409, 21.017, 7.131 };
+       /* double pos1[6] = { 153.227,471.727,31.38,-5.880,16.867,0 };
+        double pos2[6] = { 2.109,317.890,9.58,17.725,-10.480,0 };
+        double pos3[6] = { 104.984,535.990,-72.819,-13.927,0,0 };
+        double pos4[6] = { -87.104,474.137,29.056,8.572,-21.100,-4.313 };*/
+        pos.push_back(Pos(pos1).affine * cv::Affine3d(R_cam2gripper, T_cam2gripper));
+        pos.push_back(Pos(pos2).affine * cv::Affine3d(R_cam2gripper, T_cam2gripper));
+        pos.push_back(Pos(pos3).affine * cv::Affine3d(R_cam2gripper, T_cam2gripper));
+        //pos.push_back(Pos(pos4).affine * cv::Affine3d(R_cam2gripper, T_cam2gripper));
         writeXml(cp,"campos",pos);
+        //HROBOT device_id = Connect("140.120.182.134", 1, callBack);
+        //vector<Mat>R, T;
+        //camera_grabbing(device_id, pos1, 2,R,T,);
     }
     else {
         readXml(cp, "campos", pos);
     }
-        
-    cout << pos.size() << endl;
+    
+
+
     string sWorkingDir = "C:\\Users\\eug19\\workspace\\\project_all_in_one\\\project_all_in_one\\dataset\\"; 
     string out_folder = "C:\\Users\\eug19\\workspace\\project_all_in_one\\";
 
@@ -1187,6 +1169,14 @@ void ellipsesDetection(Mat R_cam2gripper, Mat T_cam2gripper) {
 
     glob(sWorkingDir + "images\\" + "*.*", names);
     int cnt = 0;
+    vector<cv::Affine3d> cam2basetest;
+    vector<cv::Affine3d> gripper2basetest;
+    vector<vector<cv::Affine3d>> circle2basetest;
+    circle2basetest.resize(names.size());
+    vector<vector<cv::Point3d>> circlecents;
+    circlecents.resize(names.size());
+
+
     for (const auto& image_name : names)
     {
         string name_ext = image_name.substr(image_name.find_last_of("\\") + 1);
@@ -1202,12 +1192,14 @@ void ellipsesDetection(Mat R_cam2gripper, Mat T_cam2gripper) {
 
         // Parameters Settings (Sect. 4.2)
         int		iThLength = 2;
-        float	fThObb = 1.0f;          //Default value is 3.0f.
+        //float	fThObb = 1.0f;          //Default value is 3.0f.
+        float	fThObb = 3.0f;
         float	fThPos = 1.0f;
         float	fTaoCenters = 0.05f;
         int 	iNs = 16;
         float	fMaxCenterDistance = sqrt(float(sz.width * sz.width + sz.height * sz.height)) * fTaoCenters;
-        float	fThScoreScore = 0.60f;  //Default value is 0.72f;.
+        //float	fThScoreScore = 0.60f;  //Default value is 0.72f;.
+        float	fThScoreScore = 0.72f;  //Default value is 0.72f;.
 
         // Other constant parameters settings. 
 
@@ -1231,35 +1223,26 @@ void ellipsesDetection(Mat R_cam2gripper, Mat T_cam2gripper) {
             iNs
         );
 
-
+        // Detect
         vector<YaedEllipse::Ellipse> ellsYaed;
         Mat1b gray_clone = gray.clone();
         yaed.Detect(gray_clone, ellsYaed);
-        cout << "How many ellipses are in this image: " << ellsYaed.size() << endl;
+        ellsYaed.resize(1);
+
 
         Mat3b resultImage = image.clone();
 
         yaed.DrawDetectedEllipses(resultImage, ellsYaed);
-        //imwrite(out_folder + name + ".png", resultImage);
-        //cv::namedWindow("Yaed", WINDOW_NORMAL);
-        //cv:imshow("Yaed", resultImage);
-        //waitKey();
+        cv::namedWindow("Yaed", WINDOW_NORMAL);
+        cv:imshow("Yaed", resultImage);
+        waitKey();
+
+
         float u = ellsYaed[0]._xc;
         float v = ellsYaed[0]._yc;
         float a = ellsYaed[0]._a;
         float b = ellsYaed[0]._b;
         float rad = ellsYaed[0]._rad;
-
-        //Point3d imgMajorPos = { u + a * cos(rad),  v + a * sin(rad), 1};
-        //Point3d imgMinorPos = { u - b * sin(rad),  v + b * cos(rad), 1};
-        //Point3d imgCenterPos = { u, v, 1};
-        //Point3d worldMajorPos;
-        //Point3d worldMinorPos;
-        //Point3d worldCenterPos;
-        //
-        //getimage2world(cMatrix, R_cam2gripper, T_cam2gripper, pos[cnt], imgMajorPos, worldMajorPos);
-        //getimage2world(cMatrix, R_cam2gripper, T_cam2gripper, pos[cnt], imgMinorPos, worldMinorPos);
-        //getimage2world(cMatrix, R_cam2gripper, T_cam2gripper, pos[cnt], imgCenterPos, worldCenterPos);
 
 
         double A = pow(a, 2) * pow(sin(rad), 2) + pow(b, 2) * pow(cos(rad), 2);
@@ -1270,24 +1253,27 @@ void ellipsesDetection(Mat R_cam2gripper, Mat T_cam2gripper) {
         double F = A * pow(u, 2) + B * u * v + C * pow(v, 2) - pow(a, 2) * pow(b, 2);
 
         Mat EllipseC = (Mat_<double>(3, 3) << A, B / 2, D / 2, B / 2, C, E / 2, D / 2, E / 2, F);
-        //Mat extrinsic = Mat(pos[cnt].affine.concatenate(cv::Affine3d(R_cam2gripper, T_cam2gripper)).inv().matrix).rowRange(0,3) ;   //extrinsic = world2cam =(cam2gripper * gripper2world).inv().rowRange(0,3) == 3*4 matrix 
-        //Mat P = cMatrix * extrinsic;
-        Mat EllipseQ = cMatrix.inv().t() * EllipseC * cMatrix.inv();
-        cout << "EllipseC" << endl;
+
+        Mat EllipseQ = cMatrix.t() * EllipseC * cMatrix;
+        cout << "EllipseC:" << endl;
         cout << EllipseC << endl;
-        cout << "EllipseQ" << endl;
+        cout << "EllipseQ:" << endl;
         cout << EllipseQ << endl;
 
+
+
+        //v1,v2,v3分別為x',y',z'
         Mat eigenval, eigenvec;
         cv::eigen(EllipseQ, eigenval, eigenvec);
-        Mat v1 = eigenvec.rowRange(0, 1);
-        Mat v2 = eigenvec.rowRange(1, 2);
-        Mat v3 = eigenvec.rowRange(2, 3);
+        Mat unoblique2cam = eigenvec.clone();
+        eigenvec.row(0).copyTo(unoblique2cam.row(1));
+        eigenvec.row(1).copyTo(unoblique2cam.row(0));
+        unoblique2cam = unoblique2cam.t();
 
 
-        cout << "eigenval" << endl;
+        cout << "Eigenval:" << endl;
         cout << eigenval << endl;
-        cout << "eigenvec" << endl;
+        cout << "Eigenvec:" << endl;
         cout << eigenvec << endl;
        
 
@@ -1295,22 +1281,49 @@ void ellipsesDetection(Mat R_cam2gripper, Mat T_cam2gripper) {
         double l2 = eigenval.at<double>(1, 0);
         double l3 = eigenval.at<double>(2, 0);
 
-        double _a = std::sqrt(-l3 / l1);
-        double _b = std::sqrt(-l3 / l2);
+        //_a為長軸,_b為短軸
+        double _a = std::sqrt(-l3 / l2);
+        double _b = std::sqrt(-l3 / l1);
+        double _c = 1;
+        cout << "Semi-major axis length:" << endl;
+        cout << _a << endl;
+        cout << "Semi-minor axis length:" << endl;
+        cout << _b << endl;
+        double _degrees = std::acos(std::sqrt( (std::pow(_b,2) * (std::pow(_a, 2) + std::pow(_c, 2))) / (std::pow(_a, 2) * (std::pow(_b, 2) + std::pow(_c, 2))) ));
+        cout <<"degree: +-" <<_degrees << endl;
+  
+     
 
-        //eigenvec.inv() = new2old
-        Mat tmp = eigenvec.inv() * (Mat_<double>(3, 1) << 0, 0, 1);
-        vconcat(tmp, Mat::ones(1, 1, CV_64FC1), tmp);
+        vector<cv::Affine3d> circles2unoblique;
+        circles2unoblique.push_back(cv::Affine3d(cv::Mat::eye(3, 3, CV_64FC1), 0).rotate(Vec3d(_degrees, 0, 0)));
+        circles2unoblique.push_back(cv::Affine3d(cv::Mat::eye(3, 3, CV_64FC1), 0).rotate(Vec3d(-_degrees, 0, 0)));
+        //cam2base * unoblique2cam * circles2unoblique = cirlces2base
+        cv::Affine3d tmp1 = pos[cnt].affine * cv::Affine3d(unoblique2cam, 0) * circles2unoblique[0];
+        cv::Affine3d tmp2 = pos[cnt].affine * cv::Affine3d(unoblique2cam, 0) * circles2unoblique[1];
+        //If Z axis of cirlces2base classified as upward, then rotation it with opposite direction.
+        double isup1 = Mat(tmp1.rotation()).at<double>(2, 2);
+        double isup2 = Mat(tmp2.rotation()).at<double>(2, 2);
+        cv::Affine3d _inv(-1 * cv::Mat::eye(3, 3, CV_64FC1), 0);
+        tmp1 = (isup1 < 0) ? tmp1 * _inv : tmp1;
+        tmp2 = (isup2 < 0) ? tmp2 * _inv : tmp2;
 
-        Mat circle_center = Mat((cv::Affine3d(R_cam2gripper, T_cam2gripper) * pos[cnt].affine).matrix).rowRange(0, 3) * tmp;
-        Mat circle_rotation = (eigenvec *  Mat((cv::Affine3d(R_cam2gripper, T_cam2gripper) * pos[cnt].affine).rotation()));
-        
-        double _degree = std::acos(std::sqrt( (_b * _b * (_a *_a + 1)) / (_a * _a * (_b * _b + 1)) ));
+        cam2basetest.push_back(pos[cnt].affine);
+        gripper2basetest.push_back(pos[cnt].affine* cv::Affine3d(R_cam2gripper, T_cam2gripper).inv());
+        circle2basetest[cnt].push_back(tmp1);
+        circle2basetest[cnt].push_back(tmp2);
+
+        circlecents[cnt].push_back(cv::Point3d(0,
+            (std::sin(_degrees)* pow(std::cos(_degrees), 2)* _c* (pow(_b, 2) + pow(_c, 2))) / (pow(_c, 2) * pow(std::cos(_degrees), 2) - pow(_b, 2) * pow(std::sin(_degrees), 2)),
+            _c* std::cos(_degrees)));
+        circlecents[cnt].push_back(cv::Point3d(0,
+            (std::sin(-_degrees)* pow(std::cos(-_degrees), 2)* _c* (pow(_b, 2) + pow(_c, 2))) / (pow(_c, 2) * pow(std::cos(-_degrees), 2) - pow(_b, 2) * pow(std::sin(-_degrees), 2)),
+            _c* std::cos(-_degrees)));
+
+
         
         //double axes_scale = 1;
         //viz::Viz3d myWindow("Viz Ellipse Cone");
         //
-
         //vector<Point3d> structure;
         //vector<Vec3b> colors;
         //vector<cv::Affine3d> cam2base;
@@ -1321,9 +1334,102 @@ void ellipsesDetection(Mat R_cam2gripper, Mat T_cam2gripper) {
         //myWindow.showWidget("Original coord", viz::WCoordinateSystem(20));
         //myWindow.showWidget("Floor Plane", viz::WPlane(Point3d(0, 0, -370.489), Vec3d(0, 0, 1), Vec3d(0, 1, 0), Size2d(1000, 1000), cv::viz::Color::black()));
         //myWindow.spin();
-        
+        cout << "===================================="<< endl;
         cnt++;
     }
+
+    //Choosing the most possible z axis by comparing cosine similarity.
+    Mat final_normal;
+    double final_score = 0;
+    int best_i=0, best_j=0,best_k=0, best_l=0;
+    for (int i = 0; i < names.size(); i++) {
+        for (int j = 0; j < 2; j++) {
+            Mat vec1 = Mat(circle2basetest[i][j].rotation()).colRange(2, 3);            
+            for (int k = i + 1; k < names.size(); k++) {
+                for (int l = 0; l < 2; l++) {
+                    Mat vec2 = Mat(circle2basetest[k][l].rotation()).colRange(2, 3);
+                    double tmp_score = cosine_similarity(vec1, vec2);
+                    /*cout << i << " " << j << " " << k << " " << l << endl;
+                    cout << vec1 << endl;
+                    cout << vec2 << endl;
+                    cout << tmp_score << endl;
+                    cout << final_score << endl;*/
+                    if (tmp_score > final_score) {
+                        final_score = tmp_score;
+                        final_normal = vec1;
+                        best_i = i;
+                        best_j = j;
+                        best_k = k;
+                        best_l = l;
+                    }
+                }
+            }
+            
+        }
+    }
+    //cout << final_normal << endl;
+    //Projecting circle center(x,y,z,1) on image plane(u,v)
+    Mat circlecentsMat1;
+    vconcat(Mat(circlecents[best_i][best_j]), cv::Mat::ones(1, 1, CV_64FC1), circlecentsMat1);
+    Mat out = Mat(circle2basetest[best_i][best_j].matrix) * circlecentsMat1;
+    Mat spatialCircleCent1 = cMatrix * Mat(cam2basetest[best_i].inv().matrix).rowRange(0, 3) * out;
+    spatialCircleCent1.at<double>(0, 0) = spatialCircleCent1.at<double>(0, 0) / spatialCircleCent1.at<double>(2, 0);
+    spatialCircleCent1.at<double>(1, 0) = spatialCircleCent1.at<double>(1, 0) / spatialCircleCent1.at<double>(2, 0);
+    spatialCircleCent1.at<double>(2, 0) = spatialCircleCent1.at<double>(2, 0) / spatialCircleCent1.at<double>(2, 0);
+    vector<cv::Point2f>p1 = { cv::Point2f(float(spatialCircleCent1.at<double>(0, 0)), spatialCircleCent1.at<double>(1, 0))
+    };
+
+    Mat circlecentsMat2;
+    vconcat(Mat(circlecents[best_k][best_l]), cv::Mat::ones(1, 1, CV_64FC1), circlecentsMat2);
+    out = Mat(circle2basetest[best_k][best_l].matrix) * circlecentsMat2;
+    Mat spatialCircleCent2 = cMatrix * Mat(cam2basetest[best_k].inv().matrix).rowRange(0, 3) * out;
+    spatialCircleCent2.at<double>(0, 0) = spatialCircleCent2.at<double>(0, 0) / spatialCircleCent2.at<double>(2, 0);
+    spatialCircleCent2.at<double>(1, 0) = spatialCircleCent2.at<double>(1, 0) / spatialCircleCent2.at<double>(2, 0);
+    spatialCircleCent2.at<double>(2, 0) = spatialCircleCent2.at<double>(2, 0) / spatialCircleCent2.at<double>(2, 0);
+    vector<cv::Point2f>p2 = { cv::Point2f(float(spatialCircleCent2.at<double>(0, 0)), float(spatialCircleCent2.at<double>(1, 0)))
+    };
+
+    //Triangulate point by given projective matrices and points
+    Mat project1 = cMatrix * Mat(cam2basetest[best_i].inv().matrix).rowRange(0,3);
+    Mat project1_float(3, 4, CV_32FC1);
+    project1.convertTo(project1_float(Range(0, 3), Range(0, 4)), CV_32FC1);
+    Mat project2 = cMatrix * Mat(cam2basetest[best_k].inv().matrix).rowRange(0, 3);
+    Mat project2_float(3, 4, CV_32FC1);
+    project2.convertTo(project2_float(Range(0, 3), Range(0, 4)), CV_32FC1);
+    Mat s;
+    triangulatePoints(project1_float, project2_float, p1, p2, s);	//輸出為 S: 齊次座標(X,Y,Z,W)，其中 W 表示座標軸的遠近參數
+
+    //Stroing spatial circle translation info
+    Mat T_final = (Mat_<double>(3,1)<<s.at<float>(0, 0) / s.at<float>(3, 0),
+        s.at<float>(1, 0) / s.at<float>(3, 0),
+        s.at<float>(2, 0) / s.at<float>(3, 0));
+
+    //HROBOT device_id = Connect("140.120.182.134", 1, callBack);
+    //double* _curpos = new double[6];
+    //get_current_position(device_id, _curpos);
+    double _curpos[6] = { -1.475, 368.0, 241.100, 0, 0, 0 };
+    Pos curpos(_curpos);
+    cout << curpos.rotation.col(2) << endl;
+    cout << final_normal << endl;
+    Mat k = curpos.rotation.col(2).cross(final_normal);
+    cv::normalize(k, k, 1.0, 0.0, NORM_L2);
+    k *= std::acos(cosine_similarity(curpos.rotation.col(2), final_normal));
+    
+    Mat current2target;
+    cv::Rodrigues(k, current2target);
+
+    vector<cv::Affine3d> final_target;
+    final_target.push_back(cv::Affine3d(current2target * curpos.rotation, T_final));
+    
+    cout << "Target coordination:" << final_target[0].matrix << endl;
+    viz::Viz3d myWindow("Viz point cloud");
+    myWindow.showWidget("Original coord", viz::WCoordinateSystem(50));
+    //myWindow.showWidget("Cam", viz::WTrajectory(cam2basetest, viz::WTrajectory::BOTH, 20));
+    //myWindow.showWidget("Gripper", viz::WTrajectory(gripper2basetest, viz::WTrajectory::BOTH, 20));
+    //myWindow.showWidget("Circle", viz::WTrajectory(circle2basetest, viz::WTrajectory::FRAMES, 20));
+    myWindow.showWidget("target", viz::WTrajectory(final_target, viz::WTrajectory::FRAMES, 50));
+    myWindow.showWidget("Floor Plane", viz::WPlane(Point3d(0, 0, -370.489), Vec3d(0, 0, 1), Vec3d(0, 1, 0), Size2d(1000, 1000), cv::viz::Color::black()));
+    myWindow.spin();
 }
 
 
@@ -1454,8 +1560,33 @@ int main(){
 
     get_RMSE(R_cam2gripper, T_cam2gripper);
     
+ 
     ellipsesDetection(R_cam2gripper, T_cam2gripper);
+    double postmp[6] = { -540.227,217.628,-450.959,15.871,-0.220 };
+    cout << Pos(postmp).rotation << endl;
     return 0;
+
+
+    /*double axes_scale = 20;
+    viz::Viz3d myWindow("Viz point cloud");
+
+    myWindow.showWidget("Original coord", viz::WCoordinateSystem(axes_scale));
+
+    myWindow.showWidget("Floor Plane", viz::WPlane(Point3d(0, 0, -370.489), Vec3d(0, 0, 1), Vec3d(0, 1, 0), Size2d(1000, 1000), cv::viz::Color::black()));*/
+
+    //    viz::WCloud structure_widget(structure, colors);
+    //    myWindow.showWidget("Point Cloud", structure_widget);
+    //myWindow.showWidget("camera_frustums", viz::WTrajectoryFrustums(base2cam4model, Matx33d(cMatrix), axes_scale, cv::viz::Color::blue()));
+    // 
+    //vector<cv::Affine3d> cam2basetest;
+    //vector<cv::Affine3d> gripper2basetest;
+    //for (int i = 0; i < R_gripper2base.size(); i++) {
+    //    cam2basetest.push_back(cv::Affine3d(R_gripper2base[i], T_gripper2base[i])* cv::Affine3d(R_cam2gripper, T_cam2gripper));
+    //    gripper2basetest.push_back(cv::Affine3d(R_gripper2base[i], T_gripper2base[i]));
+    //}
+    //myWindow.showWidget("1", viz::WTrajectory(gripper2basetest, viz::WTrajectory::BOTH, axes_scale - 10));
+    //myWindow.showWidget("2", viz::WTrajectory(cam2basetest, viz::WTrajectory::BOTH, axes_scale - 10));
+    //myWindow.spin();
     
 
     //FileStorage g2b4m("gripper2base4model.xml", FileStorage::READ);
@@ -1673,27 +1804,27 @@ int main(){
     //        }
     //    }*/
     //    //視覺化結果。
-    //    double axes_scale = 20;
-    //    viz::Viz3d myWindow("Viz point cloud");
+    //double axes_scale = 20;
+    //viz::Viz3d myWindow("Viz point cloud");
 
-    //    myWindow.showWidget("Original coord", viz::WCoordinateSystem(axes_scale));
+    //myWindow.showWidget("Original coord", viz::WCoordinateSystem(axes_scale));
 
-    //    myWindow.showWidget("Floor Plane", viz::WPlane(Point3d(0, 0, -370.489), Vec3d(0, 0, 1), Vec3d(0, 1, 0), Size2d(1000, 1000), cv::viz::Color::black()));
+    //myWindow.showWidget("Floor Plane", viz::WPlane(Point3d(0, 0, -370.489), Vec3d(0, 0, 1), Vec3d(0, 1, 0), Size2d(1000, 1000), cv::viz::Color::black()));
 
-    //    viz::WCloud structure_widget(structure, colors);
-    //    myWindow.showWidget("Point Cloud", structure_widget);
+    ////    viz::WCloud structure_widget(structure, colors);
+    ////    myWindow.showWidget("Point Cloud", structure_widget);
 
-    //    myWindow.showWidget("camera_frame_and_lines", viz::WTrajectory(base2cam4model, viz::WTrajectory::BOTH, axes_scale - 10));
-    //    myWindow.showWidget("camera_frustums", viz::WTrajectoryFrustums(base2cam4model, Matx33d(cMatrix), axes_scale, cv::viz::Color::blue()));
-
-    //    myWindow.spin();
+    //vector<cv::Affine3d> cam2basetest;
+    //vector<cv::Affine3d> gripper2basetest;
+    //for (int i = 0; i < R_gripper2base.size(); i++) {
+    //    cam2basetest.push_back(cv::Affine3d(R_cam2gripper, T_cam2gripper) * cv::Affine3d(R_gripper2base[i], T_gripper2base[i]));
+    //    gripper2basetest.push_back(cv::Affine3d(R_gripper2base[i], T_gripper2base[i]));
     //}
-    //else {
-    //    readXml(c2g, "cam2gripper", R_cam2gripper, T_cam2gripper);
-    //}
-    
-    //vector<string> cirlceimgs;
-    //get_filenames("cirlceimgs", cirlceimgs);
+    //myWindow.showWidget("camera_frame_and_lines", viz::WTrajectory(gripper2basetest, viz::WTrajectory::BOTH, axes_scale - 10));
+    //myWindow.showWidget("camera_frame_and_lines", viz::WTrajectory(cam2basetest, viz::WTrajectory::BOTH, axes_scale - 10));
+    ////myWindow.showWidget("camera_frustums", viz::WTrajectoryFrustums(base2cam4model, Matx33d(cMatrix), axes_scale, cv::viz::Color::blue()));
+
+    //myWindow.spin();
 
     
     

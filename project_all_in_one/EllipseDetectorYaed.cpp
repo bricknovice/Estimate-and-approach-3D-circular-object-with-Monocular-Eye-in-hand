@@ -1604,17 +1604,16 @@ void CEllipseDetectorYaed::PrePeocessing(Mat1b& I,
 	Mat gray;
 	// Smooth image
 	GaussianBlur(I, I, _szPreProcessingGaussKernelSize, _dPreProcessingGaussSigma);
-	//Mat1b I_thresh;
-	//cv::threshold(I, I_thresh,127,255,cv::THRESH_BINARY);
+
 	// Temp variables
 	Mat1b E;				//edge mask
 	Mat1s DX, DY;			//sobel derivatives
 
 	// Detect edges
 	Canny3(I, E, DX, DY, 3, false);
-	//cv::namedWindow("output", cv::WINDOW_NORMAL);
-	//cv:imshow("output", E);
-	//waitKey(0);
+	//cv::namedWindow("canny", cv::WINDOW_NORMAL);
+	cv:imshow("canny", E);
+	waitKey(0);
 	Toc(0); //edge detection
 
 	Tac(1); //preprocessing
@@ -1785,8 +1784,8 @@ void CEllipseDetectorYaed::Detect(Mat1b& I, vector<Ellipse>& ellipses)
 		
 	}
 
-	//imshow("out", out);
-	//waitKey(0);
+	imshow("out", out);
+	waitKey(0);
 	// time estimation, validation  inside
 
 	Tic(2); //grouping
